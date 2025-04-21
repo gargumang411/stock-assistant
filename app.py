@@ -180,17 +180,35 @@ fetch_alpha_vantage_lambda = RunnableLambda(
     lambda inputs: fetch_alpha_vantage_data(inputs["ticker"])
 )
 
+
+def clean_text(text: str) -> str:
+    # Fix spacing around numbers and units (e.g., "13.2 b i l l i o n" -> "13.2 billion")
+    text = re.sub(r'(\d+\.?\d*)\s*([a-zA-Z])\s*([a-zA-Z])\s*([a-zA-Z])\s*([a-zA-Z])\s*([a-zA-Z])\s*([a-zA-Z])\s*([a-zA-Z])', r'\1 \2\3\4\5\6\7\8', text)
+    # Fix general over-spacing (e.g., "M o r e" -> "More")
+    text = re.sub(r'([a-zA-Z])\s+([a-zA-Z])\s+([a-zA-Z])\s+([a-zA-Z])', r'\1\2\3\4', text)
+    # Replace multiple spaces with a single space
+    text = re.sub(r'\s+', ' ', text)
+    return text.strip()
+    
 def summarize_document(content: str) -> str:
-    prompt = summarize_prompt.format(document=content)
+    # Clean the input content
+    cleaned_content = clean_text(content)
+    prompt = summarize_prompt.format(document=cleaned_content)
     summary = llm.invoke(prompt).content.strip().replace("\n", " ")
-    return " ".join(summary.split()[:500])
+    # Clean the summary output
+    cleaned_summary = clean_text(summary)
+    return " ".join(cleaned_summary.split()[:500])
 
 summarize_document_lambda = RunnableLambda(summarize_document)
 
-def retrieve_docs_with_fusion(query: str, ticker: str, av_data: Dict, k=3) -> Tuple[List[Document], List[str], str]:
+
+    def retrieve_docs_with_fusion(query: str, ticker: str, av_data: Dict, k=3) -> Tuple[List[Document], List[str], str]:
     internal_docs = []
     results = vectorstore.similarity_search_with_score(query, k=2)
     for doc, score in results:
+        # Clean the document content
+        cleaned_content = clean_text(doc.page_content)
+        doc.page_content = cleaned_content
         internal_docs.append((doc, score + 0.2))
 
     web_docs = []
@@ -210,9 +228,13 @@ def retrieve_docs_with_fusion(query: str, ticker: str, av_data: Dict, k=3) -> Tu
                 for result in web_results:
                     if isinstance(result, dict) and "content" in result and "url" in result:
                         content = " ".join(result["content"].split()[:800])
-                        summarized = summarize_document(content)
-                        doc = Document(page_content=summarized, metadata={"source": result["url"]})
-                        doc_emb = np.array(embedding_model.embed_documents([summarized])[0])
+                        # Clean the content before summarization
+                        cleaned_content = clean_text(content)
+                        summarized = summarize_document(cleaned_content)
+                        # Clean the summary
+                        cleaned_summary = clean_text(summarized)
+                        doc = Document(page_content=cleaned_summary, metadata={"source": result["url"]})
+                        doc_emb = np.array(embedding_model.embed_documents([cleaned_summary])[0])
                         distance = np.linalg.norm(query_emb - doc_emb)
                         web_docs.append((doc, distance))
                 break
@@ -226,7 +248,8 @@ def retrieve_docs_with_fusion(query: str, ticker: str, av_data: Dict, k=3) -> Tu
     all_docs = internal_docs + web_docs
     if av_data:
         av_content = f"Alpha Vantage Data for {ticker}: Price: {av_data['price']}, P/E: {av_data['pe_ratio']}, EPS: {av_data['eps']}, Revenue: {av_data['revenue']}, Market Cap: {av_data['market_cap']}"
-        av_doc = Document(page_content=av_content, metadata={"source": "Alpha Vantage"})
+        cleaned_av_content = clean_text(av_content)
+        av_doc = Document(page_content=cleaned_av_content, metadata={"source": "Alpha Vantage"})
         all_docs.append((av_doc, 0.0))
 
     financial_keywords = ["earnings", "revenue", "eps", "p/e", "valuation", "analyst", "rating", "buy", "sell", "news"]
@@ -322,10 +345,14 @@ class FusionRAG:
             }
         )
 
-    def invoke(self, inputs: Dict[str, str]) -> Dict[str, str]:
-        query = inputs["query"]
-        result = self.pipeline.invoke({"query": query})
-        # Add retries and error handling for LangSmith API call
+def invoke(self, inputs: Dict[str, str]) -> Dict[str, str]:
+    query = inputs["query"]
+    result = self.pipeline.invoke({"query": query})
+    # Clean the final output
+    result["result"] = clean_text(result["result"])
+    result["doc_summaries"] = clean_text(result["doc_summaries"])
+    # Log to LangSmith with retries and full error handling
+    try:
         for attempt in range(3):  # Retry up to 3 times
             try:
                 ls_client.create_examples(
@@ -340,7 +367,9 @@ class FusionRAG:
                 if attempt == 2:  # Last attempt
                     print("Debug: Giving up on LangSmith logging after 3 attempts")
                 time.sleep(2)  # Wait 2 seconds before retrying
-        return result
+    except Exception as e:
+        print(f"Debug: LangSmith logging failed entirely: {str(e)}. Proceeding without logging.")
+    return result
 
 # Cache the pipeline
 @st.cache_resource
