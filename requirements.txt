@@ -9,9 +9,10 @@ sentence-transformers==3.0.1
 numpy==1.26.4
 requests==2.32.3
 python-dotenv==1.0.1
-chromadb==0.5.3  # Downgraded for stability
+chromadb==0.4.24  # Downgraded to work with SQLite 3.34.1
 groq==0.9.0
 huggingface_hub==0.24.5
 streamlit==1.37.0
-pysqlite3==0.5.3  
-
+fastapi==0.111.0  # Pinned for chromadb compatibility
+uvicorn==0.30.1   # Pinned for chromadb compatibility
+onnx==1.16.1      # Pinned for chromadb compatibility
