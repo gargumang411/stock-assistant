@@ -80,6 +80,8 @@ llm = ChatGroq(
 qa_prompt = PromptTemplate.from_template("""
 You are a financial assistant. Below is the context, including intermediate steps (query variants, retrieved documents, summaries) from web sources, a company database, and Alpha Vantage API. Answer the user's question clearly and concisely, citing sources (Company DB, Web, Alpha Vantage) where relevant. For news queries, prioritize recent events (e.g., 2025). For analysis queries, include key financial metrics (e.g., P/E, EPS, revenue) if available. If data is limited, provide a general response.
 
+**Formatting Instructions**: Ensure all financial terms (e.g., PERatio, EPS, TTM) and units (e.g., billion, trillion) are written without extra spaces between letters. For example, write "104.8 billion" not "104.8 b i l l i o n", and "PERatio" not "P E R a t i o".
+
 Intermediate Steps:
 - Query Variants: {query_variants}
 - Retrieved Documents: {doc_summaries}
@@ -90,14 +92,6 @@ Context:
 Question: {question}
 Answer:
 """)
-
-summarize_prompt = PromptTemplate.from_template("""
-Summarize the following financial document to ~200 words, focusing on recent news, financial metrics (e.g., P/E, EPS, revenue), or analyst recommendations. Exclude irrelevant details (e.g., ads, unrelated companies):
-
-{document}
-Summary:
-""")
-
 # Helper Functions
 def clean_query(query: str) -> str:
     query = re.sub(r'[^\w\s\-\.]', '', query)
@@ -182,10 +176,17 @@ fetch_alpha_vantage_lambda = RunnableLambda(
 
 
 def clean_text(text: str) -> str:
-    # Fix spacing around numbers and units (e.g., "13.2 b i l l i o n" -> "13.2 billion")
+    # Fix spacing around numbers and units (e.g., "104.8 b i l l i o n" -> "104.8 billion")
     text = re.sub(r'(\d+\.?\d*)\s*([a-zA-Z])\s*([a-zA-Z])\s*([a-zA-Z])\s*([a-zA-Z])\s*([a-zA-Z])\s*([a-zA-Z])\s*([a-zA-Z])', r'\1 \2\3\4\5\6\7\8', text)
     # Fix general over-spacing (e.g., "M o r e" -> "More")
     text = re.sub(r'([a-zA-Z])\s+([a-zA-Z])\s+([a-zA-Z])\s+([a-zA-Z])', r'\1\2\3\4', text)
+    # Specific fixes for financial terms
+    text = re.sub(r'P\s*E\s*R\s*a\s*t\s*i\s*o', 'PERatio', text)
+    text = re.sub(r'E\s*P\s*S', 'EPS', text)
+    text = re.sub(r'T\s*T\s*M', 'TTM', text)
+    # Fix common units
+    text = re.sub(r'b\s*i\s*l\s*l\s*i\s*o\s*n', 'billion', text, flags=re.IGNORECASE)
+    text = re.sub(r't\s*r\s*i\s*l\s*l\s*i\s*o\s*n', 'trillion', text, flags=re.IGNORECASE)
     # Replace multiple spaces with a single space
     text = re.sub(r'\s+', ' ', text)
     return text.strip()
@@ -344,33 +345,32 @@ class FusionRAG:
                 "doc_summaries": inputs["doc_summaries"]
             }
         )
-
     def invoke(self, inputs: Dict[str, str]) -> Dict[str, str]:
-        query = inputs["query"]
-        result = self.pipeline.invoke({"query": query})
-        # Clean the final output
-        result["result"] = clean_text(result["result"])
-        result["doc_summaries"] = clean_text(result["doc_summaries"])
-        # Log to LangSmith with retries and full error handling
-        try:
-            for attempt in range(3):  # Retry up to 3 times
-                try:
-                    ls_client.create_examples(
-                        dataset_id=self.dataset_id,
-                        inputs=[{"query": query}],
-                        outputs=[{"answer": result["result"]}]
-                    )
-                    print(f"Debug: Successfully logged to LangSmith for query: {query}")
-                    break
-                except Exception as e:
-                    print(f"Debug: Failed to log to LangSmith (attempt {attempt+1}/3): {str(e)}")
-                    if attempt == 2:  # Last attempt
-                        print("Debug: Giving up on LangSmith logging after 3 attempts")
-                    time.sleep(2)  # Wait 2 seconds before retrying
-        except Exception as e:
-            print(f"Debug: LangSmith logging failed entirely: {str(e)}. Proceeding without logging.")
-        return result
-
+    query = inputs["query"]
+    result = self.pipeline.invoke({"query": query})
+    # Clean the final output thoroughly
+    result["result"] = clean_text(result["result"])
+    result["doc_summaries"] = clean_text(result["doc_summaries"])
+    # Log to LangSmith with retries and full error handling
+    try:
+        for attempt in range(3):  # Retry up to 3 times
+            try:
+                ls_client.create_examples(
+                    dataset_id=self.dataset_id,
+                    inputs=[{"query": query}],
+                    outputs=[{"answer": result["result"]}]
+                )
+                print(f"Debug: Successfully logged to LangSmith for query: {query}")
+                break
+            except Exception as e:
+                print(f"Debug: Failed to log to LangSmith (attempt {attempt+1}/3): {str(e)}")
+                if attempt == 2:  # Last attempt
+                    print("Debug: Giving up on LangSmith logging after 3 attempts")
+                time.sleep(2)  # Wait 2 seconds before retrying
+    except Exception as e:
+        print(f"Debug: LangSmith logging failed entirely: {str(e)}. Proceeding without logging.")
+    return result
+    
 # Cache the pipeline
 @st.cache_resource
 def get_pipeline():
