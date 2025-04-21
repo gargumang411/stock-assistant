@@ -202,7 +202,7 @@ def summarize_document(content: str) -> str:
 summarize_document_lambda = RunnableLambda(summarize_document)
 
 
-    def retrieve_docs_with_fusion(query: str, ticker: str, av_data: Dict, k=3) -> Tuple[List[Document], List[str], str]:
+def retrieve_docs_with_fusion(query: str, ticker: str, av_data: Dict, k=3) -> Tuple[List[Document], List[str], str]:
     internal_docs = []
     results = vectorstore.similarity_search_with_score(query, k=2)
     for doc, score in results:
@@ -345,31 +345,31 @@ class FusionRAG:
             }
         )
 
-def invoke(self, inputs: Dict[str, str]) -> Dict[str, str]:
-    query = inputs["query"]
-    result = self.pipeline.invoke({"query": query})
-    # Clean the final output
-    result["result"] = clean_text(result["result"])
-    result["doc_summaries"] = clean_text(result["doc_summaries"])
-    # Log to LangSmith with retries and full error handling
-    try:
-        for attempt in range(3):  # Retry up to 3 times
-            try:
-                ls_client.create_examples(
-                    dataset_id=self.dataset_id,
-                    inputs=[{"query": query}],
-                    outputs=[{"answer": result["result"]}]
-                )
-                print(f"Debug: Successfully logged to LangSmith for query: {query}")
-                break
-            except Exception as e:
-                print(f"Debug: Failed to log to LangSmith (attempt {attempt+1}/3): {str(e)}")
-                if attempt == 2:  # Last attempt
-                    print("Debug: Giving up on LangSmith logging after 3 attempts")
-                time.sleep(2)  # Wait 2 seconds before retrying
-    except Exception as e:
-        print(f"Debug: LangSmith logging failed entirely: {str(e)}. Proceeding without logging.")
-    return result
+    def invoke(self, inputs: Dict[str, str]) -> Dict[str, str]:
+        query = inputs["query"]
+        result = self.pipeline.invoke({"query": query})
+        # Clean the final output
+        result["result"] = clean_text(result["result"])
+        result["doc_summaries"] = clean_text(result["doc_summaries"])
+        # Log to LangSmith with retries and full error handling
+        try:
+            for attempt in range(3):  # Retry up to 3 times
+                try:
+                    ls_client.create_examples(
+                        dataset_id=self.dataset_id,
+                        inputs=[{"query": query}],
+                        outputs=[{"answer": result["result"]}]
+                    )
+                    print(f"Debug: Successfully logged to LangSmith for query: {query}")
+                    break
+                except Exception as e:
+                    print(f"Debug: Failed to log to LangSmith (attempt {attempt+1}/3): {str(e)}")
+                    if attempt == 2:  # Last attempt
+                        print("Debug: Giving up on LangSmith logging after 3 attempts")
+                    time.sleep(2)  # Wait 2 seconds before retrying
+        except Exception as e:
+            print(f"Debug: LangSmith logging failed entirely: {str(e)}. Proceeding without logging.")
+        return result
 
 # Cache the pipeline
 @st.cache_resource
