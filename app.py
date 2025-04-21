@@ -338,8 +338,11 @@ st.markdown("""
 Enter a financial query (e.g., 'Fundamental Analysis of SMCI' or 'any latest news on smci?') to get detailed insights from company profiles, web news, and financial metrics.
 """)
 
-query = st.text_input("Enter your query:", value="Latest news about SMCI earnings")
-if st.button("Submit"):
+with st.form("query_form"):
+    query = st.text_input("Enter your query:", placeholder="e.g., Latest news about SMCI earnings")
+    submit = st.form_submit_button("Submit")
+
+if submit and query.strip():
     with st.spinner("Fetching answer..."):
         try:
             qa_chain = get_pipeline()
