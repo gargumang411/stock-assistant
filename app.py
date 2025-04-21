@@ -17,7 +17,6 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
 from langchain_groq import ChatGroq
 from langchain.prompts import PromptTemplate
-from chromadb.config import Settings as ClientSettings  
 
 # Load environment variables
 load_dotenv()
@@ -39,19 +38,27 @@ embedding_model = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
 # Download HuggingFace dataset
 @st.cache_resource
 def load_vectorstore():
-    dataset_path = snapshot_download(
-        repo_id="gargumang411/company_vectors",
-        repo_type="dataset",
-        cache_dir="./company_vectors_cache"
-    )
-    return Chroma(
-        persist_directory=dataset_path,
-        embedding_function=embedding_model,
-        client_settings=ClientSettings(anonymized_telemetry=False)  # 👈 ADDED THIS LINE
-    )
+    try:
+        dataset_path = snapshot_download(
+            repo_id="gargumang411/company_vectors",
+            repo_type="dataset",
+            cache_dir="./company_vectors_cache"
+        )
+        vectorstore = Chroma(
+            persist_directory=dataset_path,
+            embedding_function=embedding_model
+        )
+        return vectorstore
+    except Exception as e:
+        st.error(f"Failed to load vectorstore: {str(e)}")
+        raise e
 
-# Initialize vectorstore
-vectorstore = load_vectorstore()
+# Initialize vectorstore with error handling
+try:
+    vectorstore = load_vectorstore()
+except Exception as e:
+    st.error("Application failed to start due to vectorstore loading error. Check logs for details.")
+    st.stop()
 
 # LLM setup
 llm = ChatGroq(
@@ -164,7 +171,6 @@ fetch_alpha_vantage_lambda = RunnableLambda(
     lambda inputs: fetch_alpha_vantage_data(inputs["ticker"])
 )
 
-# Moved summarize_document before retrieve_docs_with_fusion
 def summarize_document(content: str) -> str:
     prompt = summarize_prompt.format(document=content)
     summary = llm.invoke(prompt).content.strip()
@@ -341,4 +347,4 @@ if st.button("Submit"):
             with st.expander("Retrieved Documents"):
                 st.write(response["doc_summaries"])
         except Exception as e:
-            st.error(f"Error: {str(e)}")
+            st.error(f"Error during query processing: {str(e)}")
