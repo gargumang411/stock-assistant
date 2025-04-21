@@ -23,6 +23,7 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
 from langchain_groq import ChatGroq
 from langchain.prompts import PromptTemplate
+from sentence_transformers import CrossEncoder
 
 # Load environment variables
 load_dotenv()
@@ -183,21 +184,32 @@ fetch_alpha_vantage_lambda = RunnableLambda(
 def summarize_document(content: str) -> str:
     prompt = summarize_prompt.format(document=content)
     summary = llm.invoke(prompt).content.strip()
-    return " ".join(summary.split()[:200])
+    return summary.replace("\n", " ")
 
 summarize_document_lambda = RunnableLambda(summarize_document)
 
+
+# Initialize the cross-encoder model 
+
+cross_encoder = CrossEncoder('cross-encoder/ms-marco-MiniLM-L-6-v2')
+
 def retrieve_docs_with_fusion(query: str, ticker: str, av_data: Dict, k=3) -> Tuple[List[Document], List[str], str]:
+    # Step 1: Retrieve internal documents from vector store
+
     internal_docs = []
     results = vectorstore.similarity_search_with_score(query, k=2)
     for doc, score in results:
         internal_docs.append((doc, score + 0.2))
 
+    print(f"Debug: Retrieved {len(internal_docs)} internal documents from vector store")
+  
+    # Step 2: Retrieve web documents via Tavily
     web_docs = []
     translated = translate_query(query, ticker)
     variants = generate_query_variants(translated, n=2)
     all_web_queries = [translated] + variants
     query_emb = np.array(embedding_model.embed_query(query))
+    print(f"Debug: Generated query variants: {all_web_queries}")
 
     for q in all_web_queries:
         for attempt in range(2):
@@ -215,6 +227,8 @@ def retrieve_docs_with_fusion(query: str, ticker: str, av_data: Dict, k=3) -> Tu
                         doc_emb = np.array(embedding_model.embed_documents([summarized])[0])
                         distance = np.linalg.norm(query_emb - doc_emb)
                         web_docs.append((doc, distance))
+
+                print(f"Debug: Successfully retrieved web results for query: {q}")
                 break
             except Exception as e:
                 print(f"❌ Tavily API call failed for query '{q}' (attempt {attempt+1}): {e}")
@@ -223,22 +237,46 @@ def retrieve_docs_with_fusion(query: str, ticker: str, av_data: Dict, k=3) -> Tu
                 else:
                     time.sleep(1)
 
+    # Step 3: Combine all documents
     all_docs = internal_docs + web_docs
     if av_data:
         av_content = f"Alpha Vantage Data for {ticker}: Price: {av_data['price']}, P/E: {av_data['pe_ratio']}, EPS: {av_data['eps']}, Revenue: {av_data['revenue']}, Market Cap: {av_data['market_cap']}"
         av_doc = Document(page_content=av_content, metadata={"source": "Alpha Vantage"})
         all_docs.append((av_doc, 0.0))
+    print(f"Debug: Total documents before re-ranking: {len(all_docs)}")
 
+    # Step 4: Re-rank documents using cross-encoder
+    if all_docs:
+        # Prepare query-document pairs for cross-encoder
+        doc_texts = [doc.page_content for doc, _ in all_docs]
+        query_doc_pairs = [[query, doc_text] for doc_text in doc_texts]
+        # Get cross-encoder scores
+        cross_scores = cross_encoder.predict(query_doc_pairs)
+        # Combine documents with their cross-encoder scores
+        reranked_docs = [(doc, score) for (doc, _), score in zip(all_docs, cross_scores)]
+        # Sort by cross-encoder score (higher is better)
+        reranked_docs = sorted(reranked_docs, key=lambda x: x[1], reverse=True)
+        print(f"Debug: Cross-encoder re-ranking completed. Top score: {reranked_docs[0][1] if reranked_docs else 'N/A'}")
+    else:
+        reranked_docs = []
+        print("Debug: No documents to re-rank")
+
+    # Step 5: Apply keyword-based ranking on top of cross-encoder scores
     financial_keywords = ["earnings", "revenue", "eps", "p/e", "valuation", "analyst", "rating", "buy", "sell", "news"]
     ranked_docs = []
-    for doc, score in all_docs:
+    for doc, cross_score in reranked_docs:
         keyword_score = sum(1 for kw in financial_keywords if kw in doc.page_content.lower())
-        adjusted_score = score - (keyword_score * 0.1)
+        # Combine cross-encoder score (normalized to 0-1 range) with keyword score
+        adjusted_score = cross_score - (keyword_score * 0.1)  # Cross-encoder scores are typically 0-1
         ranked_docs.append((doc, adjusted_score))
 
-    ranked_docs_sorted = sorted(ranked_docs, key=lambda x: x[1])
+    # Step 6: Sort and select top-k documents
+    ranked_docs_sorted = sorted(ranked_docs, key=lambda x: x[1], reverse=True)  # Higher cross-encoder score is better
     top_docs = [doc for doc, _ in ranked_docs_sorted[:k]]
     doc_summaries = "\n".join([f"Source: {doc.metadata.get('source', 'Company DB')}\n{doc.page_content[:100]}..." for doc in top_docs])
+    print(f"Debug: Final top {len(top_docs)} documents selected")
+
+
     return top_docs, all_web_queries, doc_summaries
 
 retrieve_docs_lambda = RunnableLambda(
