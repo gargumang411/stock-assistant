@@ -10,7 +10,7 @@ Key features include:
 - **LangSmith Tracing**: Logs all pipeline steps (e.g., query rewriting, document summaries) for transparency and debugging.
 - **Structured Answers**: Delivers detailed responses with news, financial metrics (e.g., P/E, EPS), and market sentiment, citing sources.
 
-This project was developed as an showcase of RAG systems, emphasizing modularity, robustness, and real-time financial insights.
+This project was developed as a showcase of RAG systems, emphasizing modularity, robustness, and real-time financial insights.
 
 ## Academic Value
 stock-assistant serves as a practical demonstration of advanced RAG techniques for financial analysis, suitable for projects in AI, NLP, or finance. It highlights:
@@ -125,13 +125,13 @@ View traces in the LangSmith UI under the “stock-analysis” project.
 ## Potential Improvements
 - **Evaluation**: Create a dataset of 50+ queries for precision/recall metrics.
 - **Better routing** for information retrieval for different question types.
-- **Structured Answers** based on the questions' classification i.e. Fundamental Analysis/Technical Analysis/News Sentiment.
+- **Structured Answers** based on the questions' classification i.e., Fundamental Analysis/Technical Analysis/News Sentiment.
 - Integrate **financial charts or visualizations**.
 - **Answer Quality**: Implement cross-encoder re-ranking for better document relevance.
 - **Robustness**: Add comprehensive error handling for API failures.
 - Add **agentic capabilities** for multi-step queries.
 - Implement **user feedback loop** for adaptive learning.
-- **Cron job** to keep vector DB updated.
+- **Cron job** to keep the vector DB updated.
 
 
 ## Acknowledgments
