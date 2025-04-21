@@ -34,7 +34,7 @@ stock-assistant serves as a practical demonstration of advanced RAG techniques f
 ### Setup
 1. **Clone the Repository**:
    ```bash
-   git clone https://github.com/gargumang411/stockrag.git
+   git clone https://github.com/gargumang411/stock-assistant.git
    cd stockrag
    ```
 
