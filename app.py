@@ -335,7 +335,7 @@ def get_pipeline():
 # Streamlit UI
 st.title("StockRAG: Financial Analysis Assistant")
 st.markdown("""
-Enter a financial query (e.g., 'Fundamental Analysis of Tesla' or 'any latest news on Microsoft?') to get detailed insights from company profiles, web news, and financial metrics.
+Enter a financial query to get detailed insights from company profiles, web news, and financial metrics.
 """)
 
 with st.form("query_form"):
