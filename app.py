@@ -325,15 +325,21 @@ class FusionRAG:
     def invoke(self, inputs: Dict[str, str]) -> Dict[str, str]:
         query = inputs["query"]
         result = self.pipeline.invoke({"query": query})
-
-        try:
-            ls_client.create_examples(
-                dataset_id=self.dataset_id,
-                inputs=[{"query": query}],
-                outputs=[{"answer": result["result"]}]
-            )
-        except Exception as e:
-            st.warning(f"⚠️ Failed to log example to LangSmith: {e}")
+        # Add retries and error handling for LangSmith API call
+        for attempt in range(3):  # Retry up to 3 times
+            try:
+                ls_client.create_examples(
+                    dataset_id=self.dataset_id,
+                    inputs=[{"query": query}],
+                    outputs=[{"answer": result["result"]}]
+                )
+                print(f"Debug: Successfully logged to LangSmith for query: {query}")
+                break
+            except Exception as e:
+                print(f"Debug: Failed to log to LangSmith (attempt {attempt+1}/3): {str(e)}")
+                if attempt == 2:  # Last attempt
+                    print("Debug: Giving up on LangSmith logging after 3 attempts")
+                time.sleep(2)  # Wait 2 seconds before retrying
         return result
 
 # Cache the pipeline
