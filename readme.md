@@ -71,33 +71,6 @@ stock-assistant serves as a practical demonstration of advanced RAG techniques f
     vectorstore = Chroma(persist_directory="company_vectors", embedding_function=embedding_model)
      ```
 
-## Usage
-Run the stock-assistant system to query financial news or metrics:
-
-```python
-from app import FusionRAG
-from langchain_groq import ChatGroq
-from langchain_chroma import Chroma
-from langchain_huggingface import HuggingFaceEmbeddings
-
-# Initialize components
-llm = ChatGroq(model="llama3-70b-8192", temperature=0, groq_api_key="your_groq_api_key")
-embedding_model = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
-vectorstore = Chroma(persist_directory="company_vectors", embedding_function=embedding_model)
-qa_chain = FusionRAG(llm=llm, vectorstore=vectorstore)
-
-# Run query
-query = "any latest news on smci?"
-response = qa_chain.invoke({"query": query})
-print(response["result"])
-```
-
-**Example Output**:
-```
-**Answer**:
-Super Micro Computer, Inc. (SMCI) has seen significant developments in April 2025. An independent auditing committee cleared SMCI of accounting malpractice allegations, with a new globally recognized auditor appointed, boosting investor confidence [Web: Yahoo Finance]. SMCI targets $40B in revenue for FY2026, driven by NVIDIA AI server systems, including Blackwell GPU servers [Web: Yahoo Finance]. The stock traded at ~$33.15, with a P/E of 14.90, EPS of ~$2.30, and market cap of ~$20B [Alpha Vantage]. Analyst sentiment is mixed, with Rosenblatt’s Buy rating ($60 target) and Goldman Sachs’ Sell downgrade [Web: Yahoo Finance]. [Sources: Yahoo Finance, Alpha Vantage, Company DB]
-```
-
 ## Project Structure
 - `adaptive_rag_build.py`: Core RAG pipeline with ticker extraction, retrieval, and answer generation.
 - `company_vectors/`: Chroma vector database directory with company profiles.
