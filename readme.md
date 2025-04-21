@@ -75,7 +75,7 @@ stock-assistant serves as a practical demonstration of advanced RAG techniques f
 Run the stock-assistant system to query financial news or metrics:
 
 ```python
-from adaptive_rag_build import FusionRAG
+from app import FusionRAG
 from langchain_groq import ChatGroq
 from langchain_chroma import Chroma
 from langchain_huggingface import HuggingFaceEmbeddings
