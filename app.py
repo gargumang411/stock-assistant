@@ -54,7 +54,9 @@ def load_vectorstore():
             persist_directory=dataset_path,
             embedding_function=embedding_model
         )
-        st.success("Loaded vectorstore from HuggingFace dataset.")
+        
+        # Optional: log to console instead
+        print("✅ Vectorstore loaded.")
         return vectorstore
     except Exception as e:
         st.error(f"Failed to load vectorstore: {str(e)}")
@@ -323,11 +325,15 @@ class FusionRAG:
     def invoke(self, inputs: Dict[str, str]) -> Dict[str, str]:
         query = inputs["query"]
         result = self.pipeline.invoke({"query": query})
-        ls_client.create_examples(
-            dataset_id=self.dataset_id,
-            inputs=[{"query": query}],
-            outputs=[{"answer": result["result"]}]
-        )
+
+        try:
+            ls_client.create_examples(
+                dataset_id=self.dataset_id,
+                inputs=[{"query": query}],
+                outputs=[{"answer": result["result"]}]
+            )
+        except Exception as e:
+            st.warning(f"⚠️ Failed to log example to LangSmith: {e}")
         return result
 
 # Cache the pipeline
