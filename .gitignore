@@ -1,0 +1,8 @@
+.env
+company_vectors/
+company_vectors.zip
+stock_info.csv
+.ipynb_checkpoints/
+__pycache__/
+*.pyc
+.DS_Store
