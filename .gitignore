@@ -6,3 +6,5 @@ stock_info.csv
 __pycache__/
 *.pyc
 .DS_Store
+
+company_vectors_cache/
