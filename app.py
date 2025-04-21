@@ -17,6 +17,7 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
 from langchain_groq import ChatGroq
 from langchain.prompts import PromptTemplate
+from chromadb.config import Settings as ClientSettings  
 
 # Load environment variables
 load_dotenv()
@@ -45,7 +46,8 @@ def load_vectorstore():
     )
     return Chroma(
         persist_directory=dataset_path,
-        embedding_function=embedding_model
+        embedding_function=embedding_model,
+        client_settings=ClientSettings(anonymized_telemetry=False)  # 👈 ADDED THIS LINE
     )
 
 # Initialize vectorstore
