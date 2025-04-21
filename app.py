@@ -48,6 +48,7 @@ def load_vectorstore():
             persist_directory=dataset_path,
             embedding_function=embedding_model
         )
+        st.success("Loaded vectorstore from HuggingFace dataset.")
         return vectorstore
     except Exception as e:
         st.error(f"Failed to load vectorstore: {str(e)}")
@@ -123,8 +124,8 @@ def translate_query(query: str, ticker: str) -> str:
 You're optimizing user queries for better retrieval in a stock research assistant.
 
 Example:
-Original: "any latest news on {ticker}?"
-Improved: "{ticker} latest news 2025 earnings stock performance"
+Original: "any latest news on SMCI?"
+Improved: "SMCI latest news 2025 earnings stock performance"
 
 Rewrite the user's query to maximize document retrieval relevance for {ticker}, focusing on financial news or metrics:
 \"{query}\"
