@@ -114,7 +114,7 @@ def translate_query(query: str, ticker: str) -> str:
 You're optimizing user queries for better retrieval in a stock research assistant.
 
 Example:
-Original: "any latest news on Tesla?"
+Original: "any latest news on {ticker}?"
 Improved: "{ticker} latest news 2025 earnings stock performance"
 
 Rewrite the user's query to maximize document retrieval relevance for {ticker}, focusing on financial news or metrics:
