@@ -125,9 +125,7 @@ View traces in the LangSmith UI under the “stock-analysis” project.
 ## Potential Improvements
 - **Evaluation**: Create a dataset of 50+ queries for precision/recall metrics.
 - **Better routing** for information retrieval for different question types.
-- **Structured Answers** based on the questions' classification i.e., Fundamental Analysis/Technical Analysis/News Sentiment.
 - Integrate **financial charts or visualizations**.
-- **Answer Quality**: Implement cross-encoder re-ranking for better document relevance.
 - **Robustness**: Add comprehensive error handling for API failures.
 - Add **agentic capabilities** for multi-step queries.
 - Implement **user feedback loop** for adaptive learning.
