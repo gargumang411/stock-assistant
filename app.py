@@ -112,7 +112,7 @@ def clean_query(query: str) -> str:
     return query.strip()
 
 @st.cache_resource
-def build_ticker_map(vectorstore) -> Dict[str, str]:
+def build_ticker_map(_vectorstore) -> Dict[str, str]:
     ticker_map = {}
     docs = vectorstore.get()
     for metadata in docs.get("metadatas", []):
