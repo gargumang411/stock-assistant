@@ -187,10 +187,7 @@ def fetch_alpha_vantage_data(ticker: str) -> Dict:
             }
         except Exception as e:
             print(f"❌ Alpha Vantage API call failed for {ticker} (attempt {attempt+1}): {e}")
-#             if "rate limit" in str(e).lower():
-#                 time.sleep(5)
-#             else:
-                time.sleep(2)
+            time.sleep(2)
     return {}
 
 fetch_alpha_vantage_lambda = RunnableLambda(
