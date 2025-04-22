@@ -79,8 +79,8 @@ def load_vectorstore():
 try:
     vectorstore = load_vectorstore()
 except Exception as e:
-    st.error("Application failed to start due to vectorstore loading error. Check logs for details.")
-    st.stop()
+    st.warning("Vectorstore not loaded. Results may be less accurate.")
+   # st.stop()#
 
 # LLM setup
 llm = ChatGroq(
@@ -93,7 +93,7 @@ llm = ChatGroq(
 qa_prompt = PromptTemplate.from_template("""
 You are a financial assistant. Below is the context, including intermediate steps (query variants, retrieved documents, summaries) from web sources, a company database, and Alpha Vantage API. Answer the user's question clearly and concisely, citing sources (Company DB, Web, Alpha Vantage) where relevant. For news queries, prioritize recent events (e.g., 2025). For analysis queries, include key financial metrics (e.g., P/E, EPS, revenue) if available. If data is limited, provide a general response.
 
-**Formatting Instructions**: Ensure all financial terms (e.g., PERatio, EPS, TTM) and units (e.g., billion, trillion) are written without extra spaces between letters. For example, write "104.8 billion" not "104.8 b i l l i o n", and "PERatio" not "P E R a t i o".
+**Formatting Instructions**: Ensure all words (e.g., PERatio, EPS, TTM) are written without extra spaces or new line characters between letters. For example, write "104.8 billion" not "104.8 b\ni\nl\nl\ni\no\nn".
 
 Intermediate Steps:
 - Query Variants: {query_variants}
@@ -111,6 +111,7 @@ def clean_query(query: str) -> str:
     query = " ".join(query.split()[:20])
     return query.strip()
 
+@st.cache_resource
 def build_ticker_map(vectorstore) -> Dict[str, str]:
     ticker_map = {}
     docs = vectorstore.get()
@@ -122,13 +123,18 @@ def build_ticker_map(vectorstore) -> Dict[str, str]:
 def extract_ticker(query: str, vectorstore, ticker_map: Dict[str, str]) -> str:
     query_lower = query.lower()
     for company, ticker in ticker_map.items():
-        if company in query_lower:
+        if company in query_lower or ticker.lower() in query_lower:
             return ticker
     search_results = vectorstore.similarity_search(query, k=1)
     if search_results and "ticker" in search_results[0].metadata:
         return search_results[0].metadata["ticker"]
-    prompt = f"Extract the stock ticker from this query, return only the ticker symbol or 'TSLA' if unclear:\n\"{query}\""
-    return llm.invoke(prompt).content.strip()
+    prompt = f"Extract the stock ticker from this query, return only the ticker symbol or 'Unknown' if unclear:\n\"{query}\""
+    response = llm.invoke(prompt).content.strip()
+    normalized = response.lower()
+
+    if normalized in ["unknown", "could not find", "none", "", "n/a", "na", "not available", "unavailable"]:
+        return "Unknown"
+    return response.upper()
 
 extract_ticker_lambda = RunnableLambda(
     lambda inputs: extract_ticker(inputs["query"], inputs["vectorstore"], inputs["ticker_map"])
@@ -140,7 +146,7 @@ You're optimizing user queries for better retrieval in a stock research assistan
 
 Example:
 Original: "any latest news on SMCI?"
-Improved: "SMCI latest news 2025 earnings stock performance"
+Improved: "SMCI latest news 2025 earnings analyst ratings stock performance update on business"
 
 Rewrite the user's query to maximize document retrieval relevance for {ticker}, focusing on financial news or metrics:
 \"{query}\"
@@ -162,6 +168,10 @@ generate_query_variants_lambda = RunnableLambda(
 )
 
 def fetch_alpha_vantage_data(ticker: str) -> Dict:
+    # Skip if ticker is not valid or the query isn't about a specific stock
+    if ticker.lower() in ["unknown", "none", "", "n/a", "na", "not available", "unavailable"]:
+        print(f"⚠️ Skipped Alpha Vantage fetch since no valid ticker provided ({ticker})")
+        return {}
     for attempt in range(2):
         try:
             ts = TimeSeries(key=os.environ["ALPHA_VANTAGE_API_KEY"], output_format='json')
@@ -177,10 +187,10 @@ def fetch_alpha_vantage_data(ticker: str) -> Dict:
             }
         except Exception as e:
             print(f"❌ Alpha Vantage API call failed for {ticker} (attempt {attempt+1}): {e}")
-            if "rate limit" in str(e).lower():
-                time.sleep(5)
-            else:
-                time.sleep(1)
+#             if "rate limit" in str(e).lower():
+#                 time.sleep(5)
+#             else:
+                time.sleep(2)
     return {}
 
 fetch_alpha_vantage_lambda = RunnableLambda(
@@ -189,31 +199,28 @@ fetch_alpha_vantage_lambda = RunnableLambda(
 
 
 def clean_text(text: str) -> str:
-    # Fix spacing around numbers and units (e.g., "104.8 b i l l i o n" -> "104.8 billion")
-    text = re.sub(r'(\d+\.?\d*)\s*([a-zA-Z])\s*([a-zA-Z])\s*([a-zA-Z])\s*([a-zA-Z])\s*([a-zA-Z])\s*([a-zA-Z])\s*([a-zA-Z])', r'\1 \2\3\4\5\6\7\8', text)
-    # Fix general over-spacing (e.g., "M o r e" -> "More")
-    text = re.sub(r'([a-zA-Z])\s+([a-zA-Z])\s+([a-zA-Z])\s+([a-zA-Z])', r'\1\2\3\4', text)
-    # Specific fixes for financial terms
-    text = re.sub(r'P\s*E\s*R\s*a\s*t\s*i\s*o', 'PERatio', text)
-    text = re.sub(r'E\s*P\s*S', 'EPS', text)
-    text = re.sub(r'T\s*T\s*M', 'TTM', text)
-    # Fix common units
-    text = re.sub(r'b\s*i\s*l\s*l\s*i\s*o\s*n', 'billion', text, flags=re.IGNORECASE)
-    text = re.sub(r't\s*r\s*i\s*l\s*l\s*i\s*o\s*n', 'trillion', text, flags=re.IGNORECASE)
-    # Replace multiple spaces with a single space
-    text = re.sub(r'\s+', ' ', text)
+    # Collapse characters separated by newlines
+    text = re.sub(r'(?:[a-zA-Z]\n){2,}[a-zA-Z]', lambda m: m.group(0).replace('\n', ''), text)
+    # Convert single line breaks into spaces (preserves paragraphs)
+    text = re.sub(r'(?<!\n)\n(?!\n)', ' ', text)
     return text.strip()
-    
+
+summarize_prompt = PromptTemplate.from_template("""
+Summarize the following financial document in a detailed but concise way (around 200–300 words), capturing key investor-relevant points like stock fundamentals, key news, market trends, company performance, analyst sentiment, or economic news:
+
+{document}
+Summary:
+""")
 def summarize_document(content: str) -> str:
     # Clean the input content
     cleaned_content = clean_text(content)
     prompt = summarize_prompt.format(document=cleaned_content)
     summary = llm.invoke(prompt).content.strip().replace("\n", " ")
     # Clean the summary output
-    cleaned_summary = clean_text(summary)
-    return " ".join(cleaned_summary.split()[:500])
+#     cleaned_summary = clean_text(summary)
+    return " ".join(summary.split()[:500])
 
-summarize_document_lambda = RunnableLambda(summarize_document)
+summarize_document_lambda = RunnableLambda(summarize_document) #currently this lambda is not used in code. Only the function is used.
 
 
 def retrieve_docs_with_fusion(query: str, ticker: str, av_data: Dict, k=3) -> Tuple[List[Document], List[str], str]:
@@ -221,9 +228,7 @@ def retrieve_docs_with_fusion(query: str, ticker: str, av_data: Dict, k=3) -> Tu
     results = vectorstore.similarity_search_with_score(query, k=2)
     for doc, score in results:
         # Clean the document content
-        cleaned_content = clean_text(doc.page_content)
-        doc.page_content = cleaned_content
-        internal_docs.append((doc, score + 0.2))
+        internal_docs.append((doc, score ))
 
     web_docs = []
     translated = translate_query(query, ticker)
@@ -241,23 +246,19 @@ def retrieve_docs_with_fusion(query: str, ticker: str, av_data: Dict, k=3) -> Tu
                     continue
                 for result in web_results:
                     if isinstance(result, dict) and "content" in result and "url" in result:
-                        content = " ".join(result["content"].split()[:800])
-                        # Clean the content before summarization
-                        cleaned_content = clean_text(content)
-                        summarized = summarize_document(cleaned_content)
+                        content = " ".join(result["content"].split()[:1000])
+                        
+                        summarized = summarize_document(content)
                         # Clean the summary
-                        cleaned_summary = clean_text(summarized)
-                        doc = Document(page_content=cleaned_summary, metadata={"source": result["url"]})
-                        doc_emb = np.array(embedding_model.embed_documents([cleaned_summary])[0])
+#                         cleaned_summary = clean_text(summarized)
+                        doc = Document(page_content=summarized, metadata={"source": result["url"]})
+                        doc_emb = np.array(embedding_model.embed_documents([summarized])[0])
                         distance = np.linalg.norm(query_emb - doc_emb)
                         web_docs.append((doc, distance))
                 break
             except Exception as e:
-                print(f"❌ Tavily API call failed for query '{q}' (attempt {attempt+1}): {e}")
-                if "rate limit" in str(e).lower():
-                    time.sleep(2)
-                else:
-                    time.sleep(1)
+                print(f"❌ Tavily API call failed for query '{q}' (attempt {attempt+1}): {e}")     
+                time.sleep(1)
 
     all_docs = internal_docs + web_docs
     if av_data:
@@ -366,7 +367,7 @@ class FusionRAG:
         result["doc_summaries"] = clean_text(result["doc_summaries"])
         # Log to LangSmith with retries and full error handling
         try:
-            for attempt in range(3):  # Retry up to 3 times
+            for attempt in range(2):  # Retry up to 3 times
                 try:
                     ls_client.create_examples(
                         dataset_id=self.dataset_id,
@@ -377,8 +378,8 @@ class FusionRAG:
                     break
                 except Exception as e:
                     print(f"Debug: Failed to log to LangSmith (attempt {attempt+1}/3): {str(e)}")
-                    if attempt == 2:  # Last attempt
-                        print("Debug: Giving up on LangSmith logging after 3 attempts")
+                    if attempt == 1:  # Last attempt
+                        print("Debug: Giving up on LangSmith logging after 2 attempts")
                     time.sleep(2)  # Wait 2 seconds before retrying
         except Exception as e:
             print(f"Debug: LangSmith logging failed entirely: {str(e)}. Proceeding without logging.")
@@ -395,11 +396,14 @@ st.markdown("""
 Enter a financial query to get detailed insights from company profiles, web news, and financial metrics.
 """)
 
-with st.form("query_form"):
-    query = st.text_input("Enter your query:", placeholder="e.g., Latest news about SMCI earnings")
-    submit = st.form_submit_button("Submit")
+# This input box triggers on Enter automatically
+query = st.text_input("Enter your query:", placeholder="e.g., Latest news about SMCI earnings")
 
-if submit and query.strip():
+# This button can also trigger submission
+submit = st.button("Submit")
+
+# Run the pipeline if Enter was pressed (query has content) or Submit was clicked
+if (submit or query.strip()) and query:
     with st.spinner("Fetching answer..."):
         try:
             qa_chain = get_pipeline()
