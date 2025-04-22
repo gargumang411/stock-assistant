@@ -19,11 +19,12 @@ from langchain_core.runnables import RunnableLambda, RunnableSequence
 from langchain_community.tools.tavily_search import TavilySearchResults
 from alpha_vantage.timeseries import TimeSeries
 from alpha_vantage.fundamentaldata import FundamentalData
-from langchain_huggingface import HuggingFaceEmbeddings
+# from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
 from langchain_groq import ChatGroq
 from langchain.prompts import PromptTemplate
-
+from sentence_transformers import SentenceTransformer
+from langchain_core.embeddings import Embeddings
 # Load environment variables
 load_dotenv()
 
@@ -39,7 +40,19 @@ os.environ["TAVILY_API_KEY"] = os.getenv("TAVILY_API_KEY")
 os.environ["ALPHA_VANTAGE_API_KEY"] = os.getenv("ALPHA_VANTAGE_API_KEY")
 
 # Embeddings (defined globally)
-embedding_model = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+# embedding_model = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+class LocalSentenceTransformerEmbeddings(Embeddings):
+    def __init__(self, model_path):
+        self.model = SentenceTransformer(model_path)
+    
+    def embed_documents(self, texts: List[str]) -> List[List[float]]:
+        return self.model.encode(texts).tolist()
+    
+    def embed_query(self, text: str) -> List[float]:
+        return self.model.encode([text])[0].tolist()
+
+# Load the model from the local directory
+embedding_model = LocalSentenceTransformerEmbeddings('local_model')
 
 # Download HuggingFace dataset
 @st.cache_resource
