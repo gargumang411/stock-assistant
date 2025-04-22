@@ -195,12 +195,12 @@ fetch_alpha_vantage_lambda = RunnableLambda(
 )
 
 
-def clean_text(text: str) -> str:
-    # Collapse characters separated by newlines
-    text = re.sub(r'(?:[a-zA-Z]\n){2,}[a-zA-Z]', lambda m: m.group(0).replace('\n', ''), text)
-    # Convert single line breaks into spaces (preserves paragraphs)
-    text = re.sub(r'(?<!\n)\n(?!\n)', ' ', text)
-    return text.strip()
+#def clean_text(text: str) -> str:
+#    # Collapse characters separated by newlines
+#    text = re.sub(r'(?:[a-zA-Z]\n){2,}[a-zA-Z]', lambda m: m.group(0).replace('\n', ''), text)
+#    # Convert single line breaks into spaces (preserves paragraphs)
+#    text = re.sub(r'(?<!\n)\n(?!\n)', ' ', text)
+#    return text.strip()
 
 summarize_prompt = PromptTemplate.from_template("""
 Summarize the following financial document in a detailed but concise way (around 200–300 words), capturing key investor-relevant points like stock fundamentals, key news, market trends, company performance, analyst sentiment, or economic news:
@@ -210,8 +210,8 @@ Summary:
 """)
 def summarize_document(content: str) -> str:
     # Clean the input content
-    cleaned_content = clean_text(content)
-    prompt = summarize_prompt.format(document=cleaned_content)
+    #cleaned_content = clean_text(content)
+    prompt = summarize_prompt.format(document=content)
     summary = llm.invoke(prompt).content.strip().replace("\n", " ")
     # Clean the summary output
 #     cleaned_summary = clean_text(summary)
@@ -260,8 +260,8 @@ def retrieve_docs_with_fusion(query: str, ticker: str, av_data: Dict, k=3) -> Tu
     all_docs = internal_docs + web_docs
     if av_data:
         av_content = f"Alpha Vantage Data for {ticker}: Price: {av_data['price']}, P/E: {av_data['pe_ratio']}, EPS: {av_data['eps']}, Revenue: {av_data['revenue']}, Market Cap: {av_data['market_cap']}"
-        cleaned_av_content = clean_text(av_content)
-        av_doc = Document(page_content=cleaned_av_content, metadata={"source": "Alpha Vantage"})
+        #cleaned_av_content = clean_text(av_content)
+        av_doc = Document(page_content=av_content, metadata={"source": "Alpha Vantage"})
         all_docs.append((av_doc, 0.0))
 
     financial_keywords = ["earnings", "revenue", "eps", "p/e", "valuation", "analyst", "rating", "buy", "sell", "news"]
@@ -360,8 +360,8 @@ class FusionRAG:
         query = inputs["query"]
         result = self.pipeline.invoke({"query": query})
         # Clean the final output thoroughly
-        result["result"] = clean_text(result["result"])
-        result["doc_summaries"] = clean_text(result["doc_summaries"])
+        #result["result"] = clean_text(result["result"])
+        #result["doc_summaries"] = clean_text(result["doc_summaries"])
         # Log to LangSmith with retries and full error handling
         try:
             for attempt in range(2):  # Retry up to 3 times
