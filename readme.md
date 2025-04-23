@@ -1,54 +1,66 @@
-# stock-assistant: Adaptive Retrieval-Augmented Generation for Financial Analysis
+# StockRAG: Financial Analysis Assistant
 
 ## Overview
-stock-assistant is an Adaptive Retrieval-Augmented Generation (RAG) system designed for real-time financial analysis and news retrieval. It integrates a Chroma vector database stored using HF Hub(~4,000 company tickers), web search (Tavily), financial data APIs (Alpha Vantage), and a large language model (Llama3-70B via Groq) to deliver detailed, sourced answers to user queries, such as “What does Tesla do?” The system leverages LangSmith for comprehensive tracing of intermediate steps (e.g., ticker extraction, query variants, document retrieval), making it ideal for demonstrations of adaptive RAG in financial applications.
+
+StockRAG is a Retrieval-Augmented Generation (RAG) system designed for financial analysis and news retrieval. It integrates a Chroma vector database (downloaded from HF Hub, \~4,000 company tickers), web search (Tavily), financial data APIs (Alpha Vantage), and a large language model (LLaMA3-70B via Groq) to deliver sourced answers to user queries, such as "What is Tesla's P/E ratio?" The system uses LangSmith for tracing pipeline steps (e.g., ticker extraction, query variants, document retrieval), making it great for demonstrating RAG in financial applications.
 
 Key features include:
-- **Dynamic Ticker Extraction**: Identifies company tickers (e.g., SMCI for Super Micro Computer) using a vector database and metadata lookup.
-- **Multi-Source Retrieval**: Combines company profiles (Chroma vector DB), recent web news (Tavily), and financial metrics (Alpha Vantage).
-- **Adaptive Query Processing**: Generates query variants for enhanced retrieval and summarizes documents to fit LLM context limits.
-- **LangSmith Tracing**: Logs all pipeline steps (e.g., query rewriting, document summaries) for transparency and debugging.
-- **Structured Answers**: Delivers detailed responses with news, financial metrics (e.g., P/E, EPS), and market sentiment, citing sources.
 
-This project was developed as a showcase of RAG systems, emphasizing modularity, robustness, and real-time financial insights.
+- **Ticker Extraction**: Identifies company tickers (e.g., SMCI for Super Micro Computer) using vector search and metadata.
+- **Multi-Source Retrieval**: Pulls from company profiles (Chroma vector DB), web news (Tavily), and financial metrics (Alpha Vantage).
+- **Query Processing**: Generates query variants for better retrieval and summarizes documents for LLM context.
+- **LangSmith Tracing**: Logs pipeline steps (e.g., query rewriting, document summaries) with retry logic for reliability.
+- **Structured Answers**: Provides answers with news, financial metrics (e.g., P/E, EPS), and market sentiment, citing sources.
+- **Robustness**: Includes retry logic for vectorstore loading and API calls (Tavily, Alpha Vantage).
+
+This project showcases RAG systems, focusing on modularity and real-time financial insights.
 
 ## Academic Value
-stock-assistant serves as a practical demonstration of advanced RAG techniques for financial analysis, suitable for projects in AI, NLP, or finance. It highlights:
+
+StockRAG demonstrates advanced RAG techniques for financial analysis, suitable for AI, NLP, or finance projects. It highlights:
+
 - **RAG Architecture**: Combines retrieval (vector DB, web, APIs) with generation (LLM) for context-aware answers.
-- **Vector Database Utility**: Uses Chroma with ~4,000 ticker embeddings for efficient company identification.
-- **Multi-Source Integration**: Demonstrates fusion of structured (Alpha Vantage) and unstructured (Tavily, vector DB) data.
-- **Tracing and Evaluation**: Leverages LangSmith to visualize pipeline steps, aiding debugging and performance analysis.
-- **Real-World Application**: Addresses real-time financial queries, showcasing AI’s potential in decision-making.
+- **Vector Database Utility**: Uses Chroma with \~4,000 ticker embeddings for company lookup.
+- **Multi-Source Integration**: Fuses structured (Alpha Vantage) and unstructured (Tavily, vector DB) data.
+- **Tracing and Debugging**: Leverages LangSmith to log pipeline steps, aiding analysis.
+- **Real-World Application**: Handles real-time financial queries, showing AI’s role in decision-making.
 
 ## Installation
 
 ### Prerequisites
-- Python 3.8+
+
+- Python 3.11
 - API Keys:
-  - [Tavily](https://app.tavily.com/) for web search
-  - [Alpha Vantage](https://www.alphavantage.co/) for financial data
-  - [Groq](https://console.groq.com/) for LLM access
-  - [LangSmith](https://smith.langchain.com/) for tracing
-- Chroma vector database (created from scratch using yfinance web scraping) with pre-loaded company profiles (~4,000 tickers)
+  - Tavily for web search
+  - Alpha Vantage for financial data
+  - Groq for LLM access
+  - LangSmith for tracing
+- Local embedding model (`all-MiniLM-L6-v2`) in `local_model/` directory
 
 ### Setup
+
 1. **Clone the Repository**:
+
    ```bash
-   git clone https://github.com/gargumang411/stock-assistant.git
-   cd stock-assistant
+   git clone https://github.com/gargumang411/stockrag.git
+   cd stockrag
    ```
 
 2. **Install Dependencies**:
+
    ```bash
    pip install -r requirements.txt
    ```
-   Requirements include:
-   - `langchain`, `langchain-community`, `langchain-huggingface`, `langchain-groq`, `langchain-chroma`
-   - `langsmith`, `alpha_vantage`, `sentence-transformers`, `numpy`
-   - `requests`, `python-dotenv`
 
-3. **Set Environment Variables**:
-   Create a `.env` file in the project root:
+   Requirements include:
+
+   - `streamlit==1.37.0`
+   - `langchain==0.3.1`, `langchain-community==0.3.1`, `langchain-chroma==0.1.2`, `langchain-groq==0.1.9`
+   - `langsmith==0.1.99`, `alpha-vantage==2.3.1`, `sentence-transformers==3.0.1`, `numpy==1.26.4`
+   - `requests==2.32.3`, `python-dotenv==1.0.1`, `chromadb==0.4.22`, `huggingface_hub==0.24.5`, `groq==0.22.0`, `pysqlite3-binary==0.5.2`
+
+3. **Set Environment Variables**: Create a `.env` file in the project root:
+
    ```bash
    LANGCHAIN_TRACING_V2=true
    LANGCHAIN_ENDPOINT=https://api.smith.langchain.com
@@ -59,55 +71,62 @@ stock-assistant serves as a practical demonstration of advanced RAG techniques f
    GROQ_API_KEY=your_groq_api_key
    ```
 
-4. **Prepare Vector Database**:
-   - Ensure a Chroma database (`company_vectors`) with company profiles and metadata (ticker, company_name) is available.
-   - Example setup:
-     ```python
-    from langchain_chroma import Chroma
-    from langchain_huggingface import HuggingFaceEmbeddings
-     
-        
-    embedding_model = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
-    vectorstore = Chroma(persist_directory="company_vectors", embedding_function=embedding_model)
-     ```
+4. **Set Up Embedding Model**:
+
+   - Download the `all-MiniLM-L6-v2` model from Hugging Face and place it in `local_model/`.
+   - The app uses this for embeddings instead of fetching online.
+
+5. **Vector Database**:
+
+   - The app downloads `company_vectors` from Hugging Face (`gargumang411/company_vectors`) into `./company_vectors_cache` with retry logic (3 attempts).
+
+## Usage
+
+- Run the app via Streamlit:
+
+  ```bash
+  streamlit run app.py
+  ```
+- Open `http://localhost:8501`, enter a query (e.g., "Latest news about SMCI earnings"), and view the results.
 
 ## Project Structure
-- `adaptive_rag_build.py`: Core RAG pipeline with ticker extraction, retrieval, and answer generation.
-- `company_vectors/`: Chroma vector database directory with company profiles.
-- `VectorDB_Data_loader.ipynb`: To re-create or refresh the vectorDB.
-- `.env`: Environment variables for API keys and LangSmith configuration.
+
+- `app.py`: Main RAG pipeline with ticker extraction, retrieval, and answer generation.
+- `company_vectors_cache/`: Cached directory for the Chroma vector database.
+- `local_model/`: Directory for the local embedding model (`all-MiniLM-L6-v2`).
+- `.env`: Environment variables for API keys and LangSmith config.
 - `requirements.txt`: Python dependencies.
 
 ## LangSmith Tracing
-stock-assistant integrates LangSmith to trace all pipeline steps:
-- **Ticker Extraction**: Logs identified tickers (e.g., SMCI).
-- **Query Variants**: Records rewritten queries (e.g., “SMCI latest news 2025”).
-- **Document Retrieval**: Tracks retrieved documents from vector DB, Tavily, and Alpha Vantage.
-- **Summaries and Answers**: Logs document summaries and final responses.
 
-View traces in the LangSmith UI under the “stock-analysis” project.
+StockRAG uses LangSmith to trace pipeline steps with retry logic:
+
+- **Ticker Extraction**: Logs identified tickers (e.g., SMCI).
+- **Query Variants**: Records rewritten queries (e.g., "SMCI latest news 2025").
+- **Document Retrieval**: Tracks documents from vector DB, Tavily, and Alpha Vantage.
+- **Summaries and Answers**: Logs summaries and final responses. View traces in the LangSmith UI under the "stock-analysis-rag-project" project.
 
 ## Performance Notes
-- **Query Time**: ~30 to 50 seconds per query due to multiple API calls and LLM invocations.
+
+- **Query Time**: \~30 to 50 seconds per query due to API calls and LLM processing.
 - **Optimization Opportunities**:
-  - Cache Tavily and Alpha Vantage results to reduce latency.
-  - Batch LLM calls for query rewriting and variant generation.
-  - Optimize vector DB searches with precomputed ticker maps.
-- **Scalability**: Handles ~4,000 tickers; extendable to more with additional metadata.
+  - Cache Tavily and Alpha Vantage results for faster queries.
+  - Batch LLM calls for query rewriting and variants.
+- **Scalability**: Supports \~4,000 tickers; can be extended with more metadata.
 
 ## Potential Improvements
-- **Evaluation**: Create a dataset of 50+ queries for precision/recall metrics.
-- **Better routing** for information retrieval for different question types.
-- Integrate **financial charts or visualizations**.
-- **Robustness**: Add comprehensive error handling for API failures.
-- Add **agentic capabilities** for multi-step queries.
-- Implement **user feedback loop** for adaptive learning.
-- **Cron job** to keep the vector DB updated.
 
+- **Evaluation**: Build a dataset of 50+ queries for precision/recall metrics.
+- Add financial charts or visualizations.
+- Enhance error handling for API failures.
+- Add agentic capabilities for multi-step queries.
+- Implement a user feedback loop for adaptive learning.
+- Set up a cron job to keep the vector DB updated.
 
 ## Acknowledgments
-- Built with [LangChain](https://www.langchain.com/), [LangSmith](https://smith.langchain.com/), [Tavily](https://tavily.com/), [Alpha Vantage](https://www.alphavantage.co/), and [Groq](https://groq.com/).
+
+- Built with LangChain, LangSmith, Tavily, Alpha Vantage, and Groq.
 
 ---
 
-*For issues or questions, contact [gargumang411@gmail.com] or open an issue on GitHub.*
+*For issues or questions, contact \[gargumang411@gmail.com\] or open an issue on GitHub.*
