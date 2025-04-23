@@ -57,30 +57,28 @@ embedding_model = LocalSentenceTransformerEmbeddings('local_model')
 # Download HuggingFace dataset
 @st.cache_resource
 def load_vectorstore():
-    try:
-        dataset_path = snapshot_download(
-            repo_id="gargumang411/company_vectors",
-            repo_type="dataset",
-            cache_dir="./company_vectors_cache"
-        )
-        vectorstore = Chroma(
-            persist_directory=dataset_path,
-            embedding_function=embedding_model
-        )
-        
-        # Optional: log to console instead
-        print("✅ Vectorstore loaded.")
-        return vectorstore
-    except Exception as e:
-        st.error(f"Failed to load vectorstore: {str(e)}")
-        raise e
+    dataset_path = snapshot_download(
+        repo_id="gargumang411/company_vectors",
+        repo_type="dataset",
+        cache_dir="./company_vectors_cache"
+    )
+    vectorstore = Chroma(
+        persist_directory=dataset_path,
+        embedding_function=embedding_model
+    )
+    print("✅ Vectorstore loaded.")  # Still here for console debugging
+    return vectorstore
 
 # Initialize vectorstore with error handling
-try:
-    vectorstore = load_vectorstore()
-except Exception as e:
-    st.warning("Vectorstore not loaded. Results may be less accurate.")
-   # st.stop()#
+for attempt in range(3):
+    try:
+        vectorstore = load_vectorstore()
+        break
+    except Exception as e:
+        error_msg = f"Attempt {attempt+1} failed: {str(e)}. Retrying in {wait_time} seconds..."
+        print(error_msg)  # Console logging
+        st.error(error_msg)  # UI feedback
+        time.sleep(5)
 
 # LLM setup
 llm = ChatGroq(
