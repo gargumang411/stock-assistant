@@ -38,7 +38,7 @@ StockRAG demonstrates advanced RAG techniques for financial analysis, suitable f
 - Local embedding model (`all-MiniLM-L6-v2`) in `local_model/` directory
 
 ### Setup
-
+##Demo: https://stock-assistant-umangg95.streamlit.app/
 1. **Clone the Repository**:
 
    ```bash
