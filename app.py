@@ -57,13 +57,17 @@ embedding_model = LocalSentenceTransformerEmbeddings('data/local_model')
 # Download vectorstore dataset
 @st.cache_resource
 def load_vectorstore():
-    dataset_path = "data/company_vectors"  # Local folder instead of snapshot_download
-
+    # dataset_path = "data/company_vectors"  # Local folder instead of snapshot_download
+    dataset_path = snapshot_download(
+        repo_id="gargumang411/company_vectors",
+        repo_type="dataset",
+        cache_dir="./company_vectors_cache"
+    )
     vectorstore = Chroma(
         persist_directory=dataset_path,
         embedding_function=embedding_model
     )
-    print("✅ Vectorstore loaded from local path.")
+    print("✅ Vectorstore loaded.")
     return vectorstore
 
 # Initialize vectorstore with error handling
@@ -75,7 +79,7 @@ for attempt in range(4):
     except Exception as e:
         error_msg = f"Attempt {attempt+1} failed: {str(e)}. Retrying in {wait_time} seconds..."
         print(error_msg)
-        st.error(error_msg)
+        st.warning(error_msg)
         time.sleep(wait_time)
 
 # LLM setup
