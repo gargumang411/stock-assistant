@@ -1,1 +1,4 @@
 local_model/model.safetensors filter=lfs diff=lfs merge=lfs -text
+data/local_model/** filter=lfs diff=lfs merge=lfs -text
+data/company_vectors/** filter=lfs diff=lfs merge=lfs -text
+*.sqlite3 filter=lfs diff=lfs merge=lfs -text

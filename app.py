@@ -52,33 +52,31 @@ class LocalSentenceTransformerEmbeddings(Embeddings):
         return self.model.encode([text])[0].tolist()
 
 # Load the model from the local directory
-embedding_model = LocalSentenceTransformerEmbeddings('local_model')
+embedding_model = LocalSentenceTransformerEmbeddings('data/local_model')
 
-# Download HuggingFace dataset
+# Download vectorstore dataset
 @st.cache_resource
 def load_vectorstore():
-    dataset_path = snapshot_download(
-        repo_id="gargumang411/company_vectors",
-        repo_type="dataset",
-        cache_dir="./company_vectors_cache"
-    )
+    dataset_path = "data/company_vectors"  # Local folder instead of snapshot_download
+
     vectorstore = Chroma(
         persist_directory=dataset_path,
         embedding_function=embedding_model
     )
-    print("✅ Vectorstore loaded.")  # Still here for console debugging
+    print("✅ Vectorstore loaded from local path.")
     return vectorstore
 
 # Initialize vectorstore with error handling
-for attempt in range(3):
+wait_time = 5
+for attempt in range(4):
     try:
         vectorstore = load_vectorstore()
         break
     except Exception as e:
         error_msg = f"Attempt {attempt+1} failed: {str(e)}. Retrying in {wait_time} seconds..."
-        print(error_msg)  # Console logging
-        st.error(error_msg)  # UI feedback
-        time.sleep(5)
+        print(error_msg)
+        st.error(error_msg)
+        time.sleep(wait_time)
 
 # LLM setup
 llm = ChatGroq(
@@ -319,12 +317,17 @@ class FusionRAG:
                     "translated_query": inputs["translated_query"]
                 })
             },
-            lambda inputs: {
-                **inputs,
-                "av_data": fetch_alpha_vantage_lambda.invoke({
-                    "ticker": inputs["ticker"]
-                })
-            },
+            lambda inputs: (
+                lambda av_data: {
+                    **inputs,
+                    "av_data": av_data,
+                    "_log_av": ls_client.create_examples(
+                        dataset_id=self.dataset_id,
+                        inputs=[{"ticker": inputs["ticker"]}],
+                        outputs=[{"av_data": av_data}]
+                    ) or None
+                }
+            )(fetch_alpha_vantage_lambda.invoke({"ticker": inputs["ticker"]})),
             lambda inputs: {
                 **inputs,
                 "docs": retrieve_docs_lambda.invoke({
