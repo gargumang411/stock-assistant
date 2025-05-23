@@ -43,7 +43,7 @@ os.environ["ALPHA_VANTAGE_API_KEY"] = os.getenv("ALPHA_VANTAGE_API_KEY")
 # embedding_model = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
 class LocalSentenceTransformerEmbeddings(Embeddings):
     def __init__(self, model_path):
-        self.model = SentenceTransformer(model_path)
+        self.model = SentenceTransformer(model_path, cache_folder=model_path, local_files_only=True)
     
     def embed_documents(self, texts: List[str]) -> List[List[float]]:
         return self.model.encode(texts).tolist()
