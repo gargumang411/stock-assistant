@@ -78,7 +78,7 @@ StockRAG demonstrates advanced RAG techniques for financial analysis, suitable f
 
 5. **Vector Database**:
 
-   - The app downloads `company_vectors` from Hugging Face (`gargumang411/company_vectors`) into `./company_vectors_cache` with retry logic (3 attempts).
+   - The app downloads `company_vectors` from Hugging Face (`gargumang411/company_vectors`) into `./company_vectors_cache` with retry logic (3 attempts). It's created using information about ~4000 tickers imported using yahoo finance API and converted to vector embeddings using Sentence-BERT (SBERT) transformer model. 
 
 ## Usage
 
