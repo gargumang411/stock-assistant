@@ -116,7 +116,9 @@ StockRAG uses LangSmith to trace pipeline steps with retry logic:
 
 ## Potential Improvements
 
-- **Evaluation**: Build a dataset of 50+ queries for precision/recall metrics.
+- **Evaluation**:
+    - Build a dataset of 50+ queries for precision/recall metrics.
+    - Another open-source LLM (for e.g. Llama) could be used to evaluate the results. 
 - Add financial charts or visualizations.
 - Enhance error handling for API failures.
 - Add agentic capabilities for multi-step queries.
