@@ -17,7 +17,7 @@ This project showcases RAG systems, focusing on modularity and real-time financi
 
 ### Application Demo: 
 
-![Demo Query](application_demo/app_screenshot1.png)
+![Demo Query](application_demo/app_screenshot1.jpeg)
 
 ## Academic Value
 
