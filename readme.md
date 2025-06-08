@@ -15,6 +15,10 @@ Key features include:
 
 This project showcases RAG systems, focusing on modularity and real-time financial insights.
 
+### Application Demo: 
+
+![Demo Query](application_demo/app_screenshot1.png)
+
 ## Academic Value
 
 StockRAG demonstrates advanced RAG techniques for financial analysis, suitable for AI, NLP, or finance projects. It highlights:
